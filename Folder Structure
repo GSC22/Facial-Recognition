@@ -1,0 +1,8 @@
+face_secure_project/
+├── app.py
+├── templates/
+│   └── index.html
+├── static/
+│   ├── guest/         ← Guest photos for verification
+│   ├── threats/       ← Stores unrecognized faces
+│   └── temp/          ← Stores temporary captured image
