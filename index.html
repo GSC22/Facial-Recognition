@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FaceSecure | Enhanced Facial Recognition</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+  <div class="max-w-5xl mx-auto p-6 space-y-6">
+    <h1 class="text-3xl font-bold text-indigo-600 text-center">FaceSecure Enhanced</h1>
+
+    <!-- Camera Section -->
+    <div class="bg-white rounded shadow p-4">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold">Live Camera</h2>
+        <button id="camera-toggle" class="bg-gray-700 text-white px-4 py-2 rounded">Turn On Camera</button>
+      </div>
+      <div class="relative rounded-lg overflow-hidden mb-4 aspect-video bg-black">
+        <video id="video" autoplay muted class="w-full h-full object-cover"></video>
+        <canvas id="canvas" class="hidden"></canvas>
+      </div>
+      <div class="flex gap-4">
+        <button id="capture" class="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50" disabled>Capture</button>
+        <button id="verify" class="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50" disabled>Verify</button>
+      </div>
+    </div>
+
+    <!-- Result Section -->
+    <div class="bg-white rounded shadow p-4">
+      <h2 class="text-xl font-semibold mb-4">Verification Result</h2>
+      <div id="result" class="text-center text-gray-500">No verification yet.</div>
+      <div id="matched-gallery" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6"></div>
+    </div>
+  </div>
+
+  <!-- Script -->
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const toggleBtn = document.getElementById('camera-toggle');
+    const captureBtn = document.getElementById('capture');
+    const verifyBtn = document.getElementById('verify');
+    const resultDiv = document.getElementById('result');
+    const gallery = document.getElementById('matched-gallery');
+
+    let stream = null;
+    let capturedImage = null;
+    let cameraOn = false;
+
+    toggleBtn.onclick = async () => {
+      if (cameraOn) {
+        stream.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+        cameraOn = false;
+        toggleBtn.textContent = 'Turn On Camera';
+        captureBtn.disabled = true;
+        verifyBtn.disabled = true;
+        resultDiv.textContent = 'Camera turned off.';
+      } else {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          video.srcObject = stream;
+          cameraOn = true;
+          toggleBtn.textContent = 'Turn Off Camera';
+          captureBtn.disabled = false;
+          verifyBtn.disabled = false;
+          resultDiv.textContent = 'Camera is on.';
+        } catch (e) {
+          alert('Failed to access camera.');
+        }
+      }
+    };
+
+    captureBtn.onclick = () => {
+      const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      capturedImage = canvas.toDataURL('image/jpeg');
+      resultDiv.innerHTML = '<p class="text-blue-500">Image captured. Ready to verify.</p>';
+    };
+
+    verifyBtn.onclick = () => {
+      if (!capturedImage) return alert('Capture an image first.');
+      resultDiv.innerHTML = '<p class="text-blue-500">Verifying...</p>';
+      gallery.innerHTML = '';
+
+      fetch('/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: capturedImage })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.match && data.images && data.images.length > 0) {
+          resultDiv.innerHTML = `<p class="text-green-600 font-semibold text-lg mb-4">✅ ${data.name} verified. Showing matched images:</p>`;
+          data.images.forEach(url => {
+            const card = document.createElement('div');
+            card.className = 'overflow-hidden rounded border shadow';
+            card.innerHTML = `<img src="${url}" class="w-full h-64 object-cover" />`;
+            gallery.appendChild(card);
+          });
+        } else {
+          const reason = data.reason || 'Face not recognized';
+          resultDiv.innerHTML = `<p class="text-red-600 font-semibold text-lg">❌ ${reason}. Image saved to threats folder.</p>`;
+        }
+      });
+    };
+  </script>
+</body>
+</html>
